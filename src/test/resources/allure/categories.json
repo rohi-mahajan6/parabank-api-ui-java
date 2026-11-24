@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Known defects (expected failures)",
+    "matchedStatuses": ["skipped"],
+    "messageRegex": ".*KNOWN DEFECT.*"
+  },
+  {
+    "name": "Skipped: shared public data not available",
+    "matchedStatuses": ["skipped"],
+    "messageRegex": ".*(Shared public data|shared public data).*"
+  },
+  {
+    "name": "Known defect no longer reproduces",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*did not reproduce.*"
+  },
+  {
+    "name": "Test failures",
+    "matchedStatuses": ["failed"]
+  },
+  {
+    "name": "Broken tests",
+    "matchedStatuses": ["broken"]
+  }
+]

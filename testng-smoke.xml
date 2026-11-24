@@ -12,6 +12,7 @@
                 <include name="smoke"/>
                 <exclude name="write"/>
                 <exclude name="docker"/>
+                <exclude name="known-defect"/>
             </run>
         </groups>
         <packages>

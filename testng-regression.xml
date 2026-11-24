@@ -18,6 +18,7 @@
                 <include name="smoke"/>
                 <include name="docker"/>
                 <include name="write"/>
+                <include name="known-defect"/>
             </run>
         </groups>
         <packages>

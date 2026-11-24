@@ -168,6 +168,10 @@ jobs:
           path: target/allure-results
           merge-multiple: true
 
+      # Categories put "KNOWN DEFECT" skips in their own group, so expected failures stay visible.
+      - name: Add Allure categories
+        run: cp src/test/resources/allure/categories.json target/allure-results/categories.json
+
       - name: Generate Allure report
         run: mvn -B -ntp allure:report
 

@@ -32,7 +32,7 @@ Verify that money movements (transfer, bill pay, loan, opening an account) are c
 | UI           | valid login, empty credentials, logout, accounts overview structure, activity Debit filter                                |
 | DockerGuard  | 5 unit tests: writes blocked on public, public host blocked even in Docker mode, unknown target blocked                   |
 
-**Docker-only suite** (`testng-regression.xml`, adds the groups `write` and `docker`). _Written, not yet run: results will be added from the first CI run._
+**Docker-only suite** (`testng-regression.xml`, adds the groups `write`, `docker` and `known-defect`). Runs in CI only; results in section 6.
 
 | Area         | Tests                                                                                                                                  |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,16 +92,41 @@ BUILD SUCCESS
 
 All 39 API requests recorded in the Allure attachments for that run were `GET`. An earlier run the same day had 27 tests (26 passed, 1 skipped): the skipped one was the wrong-password UI test, which has since moved to the Docker-only group.
 
-| Evidence                 | Link                         |
-| ------------------------ | ---------------------------- |
-| Latest CI run            | _pending_                    |
-| Live Allure report       | _pending_                    |
-| Docker suite results     | _pending_                    |
-| Scheduled runs (cron)    | `30 0 * * *` UTC = 06:00 IST |
+**CI run [45376749272](https://github.com/rohi-mahajan6/parabank-api-ui-java/actions/runs/45376749272), 2026-11-24** (before the known-defect marking):
+
+| Job                        | Result                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------- |
+| Smoke (public site)        | 26 tests, 26 passed                                                                          |
+| Full suite (Docker)        | 45 tests, 39 passed, 6 failed. The 6 failures are the ParaBank defects PB-001 to PB-006 below. |
+
+| Evidence              | Link                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| CI runs               | [Actions](https://github.com/rohi-mahajan6/parabank-api-ui-java/actions/workflows/e2e.yml)    |
+| Live Allure report    | [rohi-mahajan6.github.io/parabank-api-ui-java](https://rohi-mahajan6.github.io/parabank-api-ui-java/) |
+| Scheduled runs (cron) | `30 0 * * *` UTC = 06:00 IST                                                                    |
 
 ## 7. Known defects / findings
 
-Observed on the public site on 2026-11-24. Details in [docs/exploration-notes.md](docs/exploration-notes.md).
+### ParaBank defects (confirmed on Docker)
+
+Found by the Docker suite in CI run [45376749272](https://github.com/rohi-mahajan6/parabank-api-ui-java/actions/runs/45376749272) on 2026-11-24, against `parasoft/parabank` (digest `sha256:13fc1052…`) after `POST /initializeDB`. Numbers are copied from the evidence attachments in that run.
+
+Each test asserts the **correct** behaviour and belongs to the `known-defect` group. While the defect reproduces, the test is reported as skipped with a `KNOWN DEFECT PB-xxx` message and its evidence, and appears under **Known defects** in the Allure Categories tab, so the build stays green without hiding it. If a defect stops reproducing, the test fails so this table gets updated.
+
+| ID     | Severity | Request                                                                 | Expected                                         | Actual (evidence)                                                                                                                                          |
+| ------ | -------- | ----------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PB-001 | Low      | `POST /transfer?fromAccountId=54321&toAccountId=13344&amount=0`         | 4xx, no money moved                              | 200 "Successfully transferred $0 from account #54321 to account #13344". Balances unchanged (54321: 1351.12 → 1351.12; 13344: 1231.10 → 1231.10).            |
+| PB-002 | Low      | same, `amount=0.00`                                                      | 4xx, no money moved                              | 200 "Successfully transferred $0.00 …". Balances unchanged (54321: 1351.12 → 1351.12; 13344: 1231.10 → 1231.10).                                            |
+| PB-003 | High     | same, `amount=-5.00`                                                     | 4xx, no money moved                              | 200 "Successfully transferred $-5.00 …". **Money moved backwards:** source 54321 1351.12 → 1356.12 (+5.00), destination 13344 1231.10 → 1226.10 (−5.00).       |
+| PB-004 | High     | same, `amount=2356.12` (source balance 1356.12 + 1000.00)               | 4xx, no money moved                              | 200 "Successfully transferred $2356.12 …". **Source overdrawn:** 54321 1356.12 → −1000.00; destination 13344 1226.10 → 3582.22.                              |
+| PB-005 | Low      | `POST /transfer?fromAccountId=13344&toAccountId=13344&amount=1.00`      | 4xx, no transactions recorded                    | 200 "Successfully transferred $1.00 from account #13344 to account #13344". Balance unchanged (3569.88 → 3569.88). Whether a debit/credit pair is recorded: _pending, measured from the next CI run_. |
+| PB-006 | Medium   | `POST /createAccount?customerId=12212&newAccountType=1&fromAccountId=13344` | Response shows the new account's real balance | 200 `{"id":13677,"customerId":12212,"type":"SAVINGS","balance":0}`, but `GET /accounts/13677` shows 100.00 and source 13344 dropped 3469.88 → 3369.88 (100.00). The deposit works; the response reports it wrongly. |
+
+For contrast, the same run correctly rejected a non-numeric amount (`abc`) and a transfer to a non-existent account, with no money moved.
+
+### Observations from exploring the public site
+
+Details in [docs/exploration-notes.md](docs/exploration-notes.md).
 
 | ID | Area             | Observation                                                                                                                                                  | Status                       |
 | -- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
