@@ -38,6 +38,18 @@ jobs:
           java-version: '17'
           cache: maven
 
+      # Fail fast with a clear message if a secret is missing (an unset secret arrives as an empty string).
+      - name: Check required secrets
+        run: |
+          missing=""
+          [ -n "$PARABANK_USERNAME" ] || missing="$missing PARABANK_USERNAME"
+          [ -n "$PARABANK_PASSWORD" ] || missing="$missing PARABANK_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing (Settings > Secrets and variables > Actions > Repository secrets)"
+            exit 1
+          fi
+          echo "Required secrets are present."
+
       - name: Run smoke suite
         run: mvn -B -ntp test -DsuiteXml=testng-smoke.xml
 
@@ -87,6 +99,18 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+
+      # Fail fast with a clear message if a secret is missing (an unset secret arrives as an empty string).
+      - name: Check required secrets
+        run: |
+          missing=""
+          [ -n "$PARABANK_USERNAME" ] || missing="$missing PARABANK_USERNAME"
+          [ -n "$PARABANK_PASSWORD" ] || missing="$missing PARABANK_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing (Settings > Secrets and variables > Actions > Repository secrets)"
+            exit 1
+          fi
+          echo "Required secrets are present."
 
       - name: Wait for ParaBank to start
         run: |
