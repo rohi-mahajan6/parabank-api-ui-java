@@ -53,14 +53,16 @@ jobs:
       - name: Run smoke suite
         run: mvn -B -ntp test -DsuiteXml=testng-smoke.xml
 
-      # The same read-only tests also run in the Docker job. Give each result an environment-specific
-      # history id and parent suite, so Allure shows both runs instead of treating one as a retry.
+      # The same read-only tests also run in the Docker job. Allure 2.46 groups results by testCaseId,
+      # so give each result an environment-specific testCaseId, historyId and parent suite; otherwise
+      # one environment's result is folded into the other as a retry and hidden.
       - name: Tag Allure results with environment
         if: ${{ !cancelled() }}
         run: |
           for f in target/allure-results/*-result.json; do
             [ -e "$f" ] || continue
             jq '.historyId = ((.historyId // "") + "-public")
+                | .testCaseId = ((.testCaseId // "") + "-public")
                 | .labels = ([.labels[]? | select(.name != "parentSuite")] + [{"name":"parentSuite","value":"Public site (read-only)"}])' \
               "$f" > "$f.tmp" && mv "$f.tmp" "$f"
           done
@@ -132,6 +134,7 @@ jobs:
           for f in target/allure-results/*-result.json; do
             [ -e "$f" ] || continue
             jq '.historyId = ((.historyId // "") + "-docker")
+                | .testCaseId = ((.testCaseId // "") + "-docker")
                 | .labels = ([.labels[]? | select(.name != "parentSuite")] + [{"name":"parentSuite","value":"Docker ParaBank (full suite)"}])' \
               "$f" > "$f.tmp" && mv "$f.tmp" "$f"
           done
