@@ -1,0 +1,9 @@
+# Local ParaBank for running the full suite on a machine with Docker.
+# Not used yet: on this project Docker runs only in GitHub Actions (see .github/workflows/e2e.yml).
+# The image is pinned by digest so every run starts from the same build.
+services:
+  parabank:
+    # parasoft/parabank:latest as of 2026-11-19
+    image: parasoft/parabank@sha256:13fc1052551c1b32e5945e446831395d4767ddae29cca63dfc822ca54ffd303c
+    ports:
+      - '8080:8080'

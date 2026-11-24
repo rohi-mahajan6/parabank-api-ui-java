@@ -1,0 +1,21 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!--
+  Smoke suite: read-only tests only. Safe to run against the public site (TEST_ENV=public).
+  One thread, so the public site sees one request at a time.
+  Excluded: "write" (creates or moves data) and "docker" (Docker-only checks).
+-->
+<suite name="ParaBank smoke" parallel="none" thread-count="1">
+    <test name="smoke">
+        <groups>
+            <run>
+                <include name="unit"/>
+                <include name="smoke"/>
+                <exclude name="write"/>
+                <exclude name="docker"/>
+            </run>
+        </groups>
+        <packages>
+            <package name="io.github.rohimahajan6.parabank.tests.*"/>
+        </packages>
+    </test>
+</suite>

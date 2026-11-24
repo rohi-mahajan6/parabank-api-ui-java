@@ -1,0 +1,27 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!--
+  Regression suite: everything, including tests that create or move data (group "write") and
+  Docker-only checks (group "docker"). Docker ParaBank only (TEST_ENV=docker).
+
+  DockerResetListener calls POST /initializeDB once before the suite, so every run starts from
+  ParaBank's default data. With TEST_ENV=public the listener does nothing and DockerGuard blocks
+  every write call, so running this suite against the public site fails instead of writing.
+-->
+<suite name="ParaBank regression" parallel="none" thread-count="1">
+    <listeners>
+        <listener class-name="io.github.rohimahajan6.parabank.support.DockerResetListener"/>
+    </listeners>
+    <test name="regression">
+        <groups>
+            <run>
+                <include name="unit"/>
+                <include name="smoke"/>
+                <include name="docker"/>
+                <include name="write"/>
+            </run>
+        </groups>
+        <packages>
+            <package name="io.github.rohimahajan6.parabank.tests.*"/>
+        </packages>
+    </test>
+</suite>

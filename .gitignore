@@ -1,0 +1,21 @@
+# Build output
+target/
+test-output/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Reports
+allure-results/
+allure-report/
+.allure/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

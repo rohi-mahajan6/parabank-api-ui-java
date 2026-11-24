@@ -1,0 +1,173 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 00:30 UTC = 06:00 IST. One run per day.
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Read-only smoke against the public site. No Docker. DockerGuard blocks every write call.
+  smoke-public:
+    name: Smoke (public site, read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEST_ENV: public
+      PARABANK_BASE_URL: https://parabank.parasoft.com/parabank
+      PARABANK_API_URL: https://parabank.parasoft.com/parabank/services/bank
+      PARABANK_USERNAME: ${{ secrets.PARABANK_USERNAME }}
+      PARABANK_PASSWORD: ${{ secrets.PARABANK_PASSWORD }}
+      HEADLESS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run smoke suite
+        run: mvn -B -ntp test -DsuiteXml=testng-smoke.xml
+
+      # The same read-only tests also run in the Docker job. Give each result an environment-specific
+      # history id and parent suite, so Allure shows both runs instead of treating one as a retry.
+      - name: Tag Allure results with environment
+        if: ${{ !cancelled() }}
+        run: |
+          for f in target/allure-results/*-result.json; do
+            [ -e "$f" ] || continue
+            jq '.historyId = ((.historyId // "") + "-public")
+                | .labels = ([.labels[]? | select(.name != "parentSuite")] + [{"name":"parentSuite","value":"Public site (read-only)"}])' \
+              "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-public
+          path: target/allure-results
+          retention-days: 7
+
+  # Full suite, including tests that create and move data, against a throwaway ParaBank container.
+  full-docker:
+    name: Full suite (Docker ParaBank)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      parabank:
+        # parasoft/parabank:latest as of 2026-11-19, pinned by digest (same as docker-compose.yml)
+        image: parasoft/parabank@sha256:13fc1052551c1b32e5945e446831395d4767ddae29cca63dfc822ca54ffd303c
+        ports:
+          - 8080:8080
+    env:
+      TEST_ENV: docker
+      PARABANK_BASE_URL: http://localhost:8080/parabank
+      PARABANK_API_URL: http://localhost:8080/parabank/services/bank
+      PARABANK_USERNAME: ${{ secrets.PARABANK_USERNAME }}
+      PARABANK_PASSWORD: ${{ secrets.PARABANK_PASSWORD }}
+      HEADLESS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Wait for ParaBank to start
+        run: |
+          for i in $(seq 1 90); do
+            if curl -sf -o /dev/null http://localhost:8080/parabank/index.htm; then
+              echo "ParaBank is up after about $((i * 2))s"; exit 0
+            fi
+            sleep 2
+          done
+          echo "ParaBank did not start within 180s"; exit 1
+
+      # DockerResetListener calls POST /initializeDB before the suite starts.
+      - name: Run regression suite
+        run: mvn -B -ntp test -DsuiteXml=testng-regression.xml
+
+      - name: Tag Allure results with environment
+        if: ${{ !cancelled() }}
+        run: |
+          for f in target/allure-results/*-result.json; do
+            [ -e "$f" ] || continue
+            jq '.historyId = ((.historyId // "") + "-docker")
+                | .labels = ([.labels[]? | select(.name != "parentSuite")] + [{"name":"parentSuite","value":"Docker ParaBank (full suite)"}])' \
+              "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-docker
+          path: target/allure-results
+          retention-days: 7
+
+  report:
+    name: Allure report
+    needs: [smoke-public, full-docker]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Download Allure results from both jobs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: target/allure-results
+          merge-multiple: true
+
+      - name: Generate Allure report
+        run: mvn -B -ntp allure:report
+
+      - name: Upload Allure report
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: target/site/allure-maven-plugin
+          retention-days: 14
+
+      - name: Upload Pages artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/site/allure-maven-plugin
+
+  deploy:
+    name: Deploy report to GitHub Pages
+    needs: report
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
