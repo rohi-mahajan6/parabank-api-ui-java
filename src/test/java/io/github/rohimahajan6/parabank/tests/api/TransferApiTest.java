@@ -2,10 +2,12 @@ package io.github.rohimahajan6.parabank.tests.api;
 
 import io.github.rohimahajan6.parabank.api.ApiClient;
 import io.github.rohimahajan6.parabank.api.model.Account;
+import io.github.rohimahajan6.parabank.support.Evidence;
 import io.github.rohimahajan6.parabank.support.LiveData;
 import io.github.rohimahajan6.parabank.support.Money;
 import io.restassured.response.Response;
 import java.math.BigDecimal;
+import org.assertj.core.api.SoftAssertions;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -83,14 +85,32 @@ public class TransferApiTest {
         assertRejectedWithoutMovement(from.id(), to.id(), tooMuch.toPlainString());
     }
 
+    /**
+     * Records the full picture before asserting: HTTP status, response body and both balances
+     * before and after. The evidence is attached to the Allure report, and the checks are soft
+     * assertions, so a failing status check no longer hides whether money actually moved.
+     */
     private void assertRejectedWithoutMovement(long fromId, long toId, String amount) {
         BigDecimal fromBefore = Money.balance(api, fromId);
         BigDecimal toBefore = Money.balance(api, toId);
 
         Response response = api.transfer(fromId, toId, amount);
 
-        assertThat(response.statusCode()).as("HTTP status for amount " + amount).isBetween(400, 499);
-        assertThat(Money.balance(api, fromId)).as("source balance").isEqualByComparingTo(fromBefore);
-        assertThat(Money.balance(api, toId)).as("destination balance").isEqualByComparingTo(toBefore);
+        BigDecimal fromAfter = Money.balance(api, fromId);
+        BigDecimal toAfter = Money.balance(api, toId);
+        Evidence.attach("Transfer evidence", String.join("\n",
+                "request: POST /transfer?fromAccountId=" + fromId + "&toAccountId=" + toId + "&amount=" + amount,
+                "status:  " + response.statusCode(),
+                "body:    " + response.asString(),
+                "source " + fromId + ":      before " + fromBefore + "  after " + fromAfter
+                        + "  change " + fromAfter.subtract(fromBefore),
+                "destination " + toId + ": before " + toBefore + "  after " + toAfter
+                        + "  change " + toAfter.subtract(toBefore)));
+
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(response.statusCode()).as("HTTP status for amount " + amount).isBetween(400, 499);
+        softly.assertThat(fromAfter).as("source balance (before " + fromBefore + ")").isEqualByComparingTo(fromBefore);
+        softly.assertThat(toAfter).as("destination balance (before " + toBefore + ")").isEqualByComparingTo(toBefore);
+        softly.assertAll();
     }
 }

@@ -105,7 +105,7 @@ Observed on the public site on 2026-11-24. Details in [docs/exploration-notes.md
 
 | ID | Area             | Observation                                                                                                                                                  | Status                       |
 | -- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Q1 | Login (UI)       | A wrong password, and an unknown username, logged in as John Smith (2 of 2 attempts in fresh sessions). The API rejects the same credentials with 400.       | To be confirmed on Docker    |
+| Q1 | Login (UI)       | A wrong password, and an unknown username, logged in as John Smith (2 of 2 attempts in fresh sessions). The API rejects the same credentials with 400.       | Not reproduced on Docker; public site only (CI run 45375606515, `wrongPasswordIsRejected` passed) |
 | Q6 | Transactions API | Date filters only accept `MM-dd-yyyy`. An ISO date (`2026-11-24`) returns 200 with an empty list instead of a validation error.                             | Observed on public site      |
 | Q7 | Transactions API | `GET /accounts/{id}/transactions` returns 400 "Could not find transactions for account #{id}" when there are none; the date filters return 200 `[]` instead. | Observed on public site      |
 
