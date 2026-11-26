@@ -24,9 +24,16 @@ public class LoginApiTest {
         assertThat(response.contentType()).startsWith("application/json");
         response.then().body(matchesJsonSchemaInClasspath("schemas/customer.json"));
 
+        // The public demo customer is shared and can be renamed by anyone (CI run 45580958874 saw
+        // "John Smith" become "Anitha Madhavan"), so the name is not hard-coded. The login response
+        // must name a customer, and it must be the same customer GET /customers/{id} returns.
         Customer customer = response.as(Customer.class);
-        assertThat(customer.firstName()).isEqualTo("John");
-        assertThat(customer.lastName()).isEqualTo("Smith");
+        assertThat(customer.firstName()).as("first name").isNotBlank();
+        assertThat(customer.lastName()).as("last name").isNotBlank();
+
+        Customer byId = api.customer(customer.id()).as(Customer.class);
+        assertThat(byId.firstName()).as("first name from GET /customers/" + customer.id()).isEqualTo(customer.firstName());
+        assertThat(byId.lastName()).as("last name from GET /customers/" + customer.id()).isEqualTo(customer.lastName());
     }
 
     @Test(groups = "smoke", description = "Wrong password returns 400 'Invalid username and/or password'")

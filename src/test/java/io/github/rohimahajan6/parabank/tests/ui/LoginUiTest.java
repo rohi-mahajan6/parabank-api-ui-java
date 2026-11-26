@@ -1,7 +1,11 @@
 package io.github.rohimahajan6.parabank.tests.ui;
 
+import io.github.rohimahajan6.parabank.api.ApiClient;
+import io.github.rohimahajan6.parabank.api.model.Customer;
 import io.github.rohimahajan6.parabank.config.TestEnv;
 import io.github.rohimahajan6.parabank.support.BaseUiTest;
+import io.github.rohimahajan6.parabank.support.Evidence;
+import io.github.rohimahajan6.parabank.support.LiveData;
 import io.github.rohimahajan6.parabank.ui.pages.LoginPage;
 import org.testng.SkipException;
 import org.testng.annotations.Test;
@@ -10,13 +14,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class LoginUiTest extends BaseUiTest {
 
-    @Test(groups = "smoke", description = "Valid login shows 'Welcome John Smith' and lands on the overview")
+    /**
+     * The welcome text the UI should show for the demo customer, built from the API login response.
+     * The public demo customer is shared and gets renamed (CI run 45580958874: "John Smith" became
+     * "Anitha Madhavan", with a trailing space in the API's first name), so the name is fetched, not
+     * hard-coded. Whitespace is collapsed the same way the browser renders it.
+     */
+    private String expectedWelcome() {
+        Customer customer = new LiveData(new ApiClient()).demoCustomer();
+        String expected = ("Welcome " + customer.firstName() + " " + customer.lastName()).replaceAll("\\s+", " ").trim();
+        Evidence.attach("Expected welcome (from API login)", expected);
+        return expected;
+    }
+
+    @Test(groups = "smoke", description = "Valid login shows 'Welcome <name from the API>' and lands on the overview")
     public void validLoginShowsWelcome() {
+        String expected = expectedWelcome();
         LoginPage login = new LoginPage(driver, config.baseUrl()).open();
 
         login.logIn(config.username(), config.password());
 
-        assertThat(login.welcomeText()).isEqualTo("Welcome John Smith");
+        assertThat(login.welcomeText()).isEqualTo(expected);
         assertThat(driver.getCurrentUrl()).contains("/overview.htm");
     }
 
@@ -32,9 +50,10 @@ public class LoginUiTest extends BaseUiTest {
 
     @Test(groups = "smoke", description = "Logging out returns to the login form")
     public void logoutReturnsToLoginForm() {
+        String expected = expectedWelcome();
         LoginPage login = new LoginPage(driver, config.baseUrl()).open();
         login.logIn(config.username(), config.password());
-        assertThat(login.welcomeText()).isEqualTo("Welcome John Smith");
+        assertThat(login.welcomeText()).isEqualTo(expected);
 
         login.logOut();
 
